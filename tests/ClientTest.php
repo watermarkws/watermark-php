@@ -110,7 +110,7 @@ class ClientTest extends TestCase
 
         $this->assertSame('succeeded', $done['status']);
         $this->assertSame([1.0, 1.5], $this->slept);
-        $this->assertSame('https://api.test/v1/requests/3', (string) $this->history[2]['request']->getUri());
+        $this->assertSame('https://api.test/v1/requests/3?wait=25', (string) $this->history[2]['request']->getUri());
     }
 
     public function test_wait_gives_up_after_the_timeout():void
@@ -131,6 +131,74 @@ class ClientTest extends TestCase
 
         $this->assertSame('limit=5&before=100', $this->history[0]['request']->getUri()->getQuery());
         $this->assertSame('group_by=endpoint', $this->history[1]['request']->getUri()->getQuery());
+    }
+
+    public function test_create_makes_an_image_from_a_canvas_and_a_source_can_be_a_storage_object():void
+    {
+        $client = $this->client([new Response(202, [], '{"id":4}'), new Response(202, [], '{"id":5}')]);
+
+        $client->images->create(1200, 300, [['type' => 'text', 'text' => 'Hi', 'font' => 'inter-bold', 'size' => 96]], ['background' => '#ffffff', 'wait' => 10]);
+        $client->videos->process(['storage' => 'stg_7a', 'key' => 'in/clip.mov'], [['type' => 'grayscale']]);
+
+        $this->assertSame('https://api.test/v1/images/create', (string) $this->history[0]['request']->getUri());
+        $this->assertSame(['width' => 1200, 'height' => 300, 'operations' => [['type' => 'text', 'text' => 'Hi', 'font' => 'inter-bold', 'size' => 96]], 'background' => '#ffffff', 'wait' => 10], json_decode((string) $this->history[0]['request']->getBody(), true));
+        $this->assertSame(['storage' => 'stg_7a', 'key' => 'in/clip.mov'], json_decode((string) $this->history[1]['request']->getBody(), true)['source']);
+    }
+
+    public function test_an_upload_is_made_and_the_file_put_to_its_url():void
+    {
+        $path = tempnam(sys_get_temp_dir(), 'wm') . '.png';
+        file_put_contents($path, 'not really a png');
+
+        $client = $this->client([
+            new Response(201, [], json_encode(['id' => 'upl_1', 'status' => 'pending', 'upload' => ['method' => 'PUT', 'url' => 'https://bucket.test/u/1?sig=x', 'headers' => ['Content-Type' => 'image/png', 'x-amz-meta-a' => 'b']]])),
+            new Response(200),
+        ]);
+
+        try {
+            $upload = $client->uploads->create($path);
+        } finally {
+            unlink($path);
+        }
+
+        $this->assertSame('upl_1', $upload['id']);
+        $this->assertSame(['filename' => basename($path), 'size' => 16, 'content_type' => 'image/png'], json_decode((string) $this->history[0]['request']->getBody(), true));
+
+        $put = $this->history[1]['request'];
+
+        $this->assertSame('PUT', $put->getMethod());
+        $this->assertSame('https://bucket.test/u/1?sig=x', (string) $put->getUri());
+        $this->assertSame('b', $put->getHeaderLine('x-amz-meta-a'));
+        $this->assertSame('', $put->getHeaderLine('Authorization'));
+        $this->assertSame('not really a png', (string) $put->getBody());
+    }
+
+    public function test_files_storage_events_and_fonts_call_their_endpoints():void
+    {
+        $client = $this->client(array_fill(0, 8, new Response(200, [], '{}')));
+
+        $client->files->get('file_1');
+        $client->files->delete('file_1');
+        $client->storage->connect(['bucket' => 'b', 'region' => 'us-east-1', 'role_arn' => 'arn:aws:iam::1:role/r']);
+        $client->storage->verify('stg_7a');
+        $client->storage->disconnect('stg_7a');
+        $client->events->since(new \DateTimeImmutable('2026-10-13T15:00:00Z'), 50);
+        $client->fonts->list();
+        $client->uploads->delete('upl_1');
+
+        $calls = array_map(fn (array $entry) => $entry['request']->getMethod() . ' ' . $entry['request']->getUri()->getPath(), $this->history);
+
+        $this->assertSame([
+            'GET /v1/files/file_1',
+            'DELETE /v1/files/file_1',
+            'POST /v1/storage',
+            'POST /v1/storage/stg_7a/verify',
+            'DELETE /v1/storage/stg_7a',
+            'GET /v1/events',
+            'GET /v1/fonts',
+            'DELETE /v1/uploads/upl_1',
+        ], $calls);
+        $this->assertSame('since=2026-10-13T15%3A00%3A00%2B00%3A00&limit=50', $this->history[5]['request']->getUri()->getQuery());
     }
 
     /**

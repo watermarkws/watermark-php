@@ -4,8 +4,13 @@ namespace Watermark\Api;
 
 use Watermark\Api\Resources\Account;
 use Watermark\Api\Resources\Documents;
+use Watermark\Api\Resources\Events;
+use Watermark\Api\Resources\Files;
+use Watermark\Api\Resources\Fonts;
 use Watermark\Api\Resources\Images;
 use Watermark\Api\Resources\Requests;
+use Watermark\Api\Resources\Storage;
+use Watermark\Api\Resources\Uploads;
 use Watermark\Api\Resources\Videos;
 
 /**
@@ -26,6 +31,11 @@ class Client
     public readonly Documents $documents;
     public readonly Requests $requests;
     public readonly Account $account;
+    public readonly Files $files;
+    public readonly Uploads $uploads;
+    public readonly Storage $storage;
+    public readonly Events $events;
+    public readonly Fonts $fonts;
 
     /**
      * @param string               $apiKey  wm_live_… or wm_test_…
@@ -45,5 +55,10 @@ class Client
         $this->documents = new Documents($transport);
         $this->requests = new Requests($transport, \Closure::fromCallable($sleep));
         $this->account = new Account($transport);
+        $this->files = new Files($transport);
+        $this->uploads = new Uploads($transport, $options['http_client'] ?? null);
+        $this->storage = new Storage($transport);
+        $this->events = new Events($transport);
+        $this->fonts = new Fonts($transport);
     }
 }
