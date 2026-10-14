@@ -26,5 +26,11 @@
     "config": {
         "sort-packages": true
     },
-    "minimum-stability": "stable"
+    "minimum-stability": "stable",
+    "scripts": {
+        "spec:refresh": "@php scripts/refresh-spec.php"
+    },
+    "scripts-descriptions": {
+        "spec:refresh": "Record the API's current openapi.json as the spec this library is checked against (spec/openapi.json and spec.sha). Run after updating the library."
+    }
 }

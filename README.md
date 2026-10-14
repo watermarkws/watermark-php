@@ -23,28 +23,33 @@ $request = $client->images->process('https://example.com/photo.jpg', [
 $done = $client->requests->wait($request['id']);   // polls until succeeded, failed or aborted
 
 if ($done['status'] === 'succeeded') {
-    $url = $done['result']['files'][0]['url'];      // signed, valid for an hour
+    $url = $done['result']['files'][0]['url'];      // works until the result is deleted, 7 days on
 }
 ```
 
-Every processing call starts a background request and returns it (`status: queued`). Options on every call: `webhook_url`, `customer`, `metadata`, `idempotency_key`; processing calls also take `output` (`['format' => 'png']`).
+Every processing call starts a background request and returns it (`status: queued`). Options on every call: `webhook_url`, `events`, `customer`, `metadata`, `wait` (seconds the API may hold the answer until the request finishes), `idempotency_key`; calls that make files also take `output` (`['format' => 'png']`) or `outputs`, and `$client->images->read()` takes `level`. The options array goes to the API as given, so a parameter the API adds later works without an update.
 
 | Call | Endpoint |
 | --- | --- |
 | `$client->images->process($source, $operations, $options)` | `POST /v1/images/process` |
 | `$client->images->read($source)` | `POST /v1/images/read` |
+| `$client->images->create($width, $height, $operations, $options)` | `POST /v1/images/create` |
 | `$client->videos->process($source, $operations, $options)` | `POST /v1/videos/process` |
 | `$client->videos->read($source)` / `->screenshot($source, $seconds)` | `POST /v1/videos/read`, `/screenshot` |
 | `$client->documents->process($source, $operations)` | `POST /v1/documents/process` |
 | `$client->documents->read($source)` / `->snapshot($source, $page)` | `POST /v1/documents/read`, `/snapshot` |
 | `$client->requests->get($id)` / `->list()` / `->abort($id)` / `->wait($id)` | `/v1/requests` |
 | `$client->account->get()` / `->usage([...])` / `->operations()` | `/v1/account`, `/v1/usage`, `/v1/operations` |
+| `$client->files->get($id)` / `->delete($id)` | `/v1/files` |
+| `$client->uploads->create($path)` / `->get($id)` / `->delete($id)` | `/v1/uploads` |
+| `$client->events->since($time, $limit)` / `$client->fonts->list()` | `/v1/events`, `/v1/fonts` |
+| `$client->storage->connect([...])` / `->list()` / `->get($id)` / `->update($id, ['prefixes' => [...]])` / `->verify($id)` / `->disconnect($id)` | `/v1/storage` |
 
 Operations and their parameters: https://api.watermark.ws/docs/operations.md
 
 ## Errors
 
-API errors throw `Watermark\Api\Exceptions\ApiException` subclasses (`InvalidRequestException`, `PaymentRequiredException`, `RateLimitException`, ...). Branch on `getErrorCode()`; `getParam()` names the input at fault. A failed *request* is not an exception: its `status` is `failed` and `error` says why.
+API errors throw `Watermark\Api\Exceptions\ApiException` subclasses (`InvalidRequestException`, `PaymentRequiredException`, `RateLimitException`, ...). Branch on `getErrorCode()`; `getParam()` names the input at fault. The client passes every error code through as the API sends it, so a code added later needs no update; the codes are listed at https://api.watermark.ws/docs/errors.md. `getError()` is the whole error object, with the fields some errors add, such as the `permissions_policy` a storage change whose check failed needs. A failed *request* is not an exception: its `status` is `failed` and `error` says why.
 
 The client retries 429s (after `Retry-After`), 5xx responses and dropped connections twice, sending the same `Idempotency-Key`, so a retry never runs a request twice.
 
@@ -66,3 +71,5 @@ $event = Webhook::constructEvent(
 composer install
 vendor/bin/phpunit
 ```
+
+`tests/SpecCoverageTest.php` holds the client to the API's OpenAPI spec: every endpoint has a method, every parameter is sent, and the spec is the one in `spec/openapi.json`, whose sha256 is in `spec.sha`. It reads the spec from `WATERMARK_API_SPEC` (a path or URL), else `../watermark-api`, else `spec/openapi.json`. When the API changes, update the library, then run `composer spec:refresh` to record the new spec as checked.
