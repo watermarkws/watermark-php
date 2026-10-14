@@ -173,6 +173,28 @@ class ClientTest extends TestCase
         $this->assertSame('not really a png', (string) $put->getBody());
     }
 
+    public function test_an_upload_of_an_svg_or_a_camera_raw_file_names_its_type():void
+    {
+        foreach (['svg' => 'image/svg+xml', 'nef' => 'image/x-nikon-nef', 'wmv' => 'video/x-ms-wmv'] as $extension => $type) {
+            $path = tempnam(sys_get_temp_dir(), 'wm') . ".{$extension}";
+            file_put_contents($path, 'contents');
+            $this->history = [];
+
+            $client = $this->client([
+                new Response(201, [], json_encode(['id' => 'upl_1', 'status' => 'pending', 'upload' => ['method' => 'PUT', 'url' => 'https://bucket.test/u/1?sig=x', 'headers' => ['Content-Type' => $type]]])),
+                new Response(200),
+            ]);
+
+            try {
+                $client->uploads->create($path);
+            } finally {
+                unlink($path);
+            }
+
+            $this->assertSame($type, json_decode((string) $this->history[0]['request']->getBody(), true)['content_type'], $extension);
+        }
+    }
+
     public function test_files_storage_events_and_fonts_call_their_endpoints():void
     {
         $client = $this->client(array_fill(0, 8, new Response(200, [], '{}')));
