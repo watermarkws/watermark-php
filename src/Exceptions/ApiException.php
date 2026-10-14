@@ -20,6 +20,7 @@ class ApiException extends RuntimeException
      * @param string|null                $requestId
      * @param array<string, string[]>    $errors    Every invalid field, for a validation error.
      * @param Throwable|null             $previous
+     * @param array<string, mixed>       $error     The whole error object, with the fields some errors add.
      */
     public function __construct(
         string $message,
@@ -30,6 +31,7 @@ class ApiException extends RuntimeException
         private ?string $requestId = null,
         private array $errors = [],
         ?Throwable $previous = null,
+        private array $error = [],
     ) {
         parent::__construct($message, $status, $previous);
     }
@@ -65,6 +67,8 @@ class ApiException extends RuntimeException
             $error['param'] ?? null,
             isset($error['request_id']) ? (string) $error['request_id'] : null,
             $error['errors'] ?? [],
+            null,
+            $error,
         );
     }
 
@@ -99,5 +103,17 @@ class ApiException extends RuntimeException
     public function getErrors():array
     {
         return $this->errors;
+    }
+
+    /**
+     * The whole error object as the API sent it, with the fields some errors
+     * add: a storage change whose check failed carries the
+     * permissions_policy its new settings need.
+     *
+     * @return array<string, mixed>
+     */
+    public function getError():array
+    {
+        return $this->error;
     }
 }

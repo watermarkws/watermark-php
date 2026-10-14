@@ -26,13 +26,14 @@ class Storage
      * Connect a bucket. The connection starts unverified: create the role
      * with the trust and permissions policies it returns, then verify it.
      *
-     * @param array<string, mixed> $connection bucket, region, role_arn, prefixes.
+     * @param array<string, mixed> $connection bucket, region, role_arn, prefixes, and read and write
+     *                                         (both true unless sent); provider is s3 unless sent.
      *
      * @return array<string, mixed>
      */
     public function connect(array $connection):array
     {
-        return $this->transport->request('POST', '/v1/storage', $connection);
+        return $this->transport->request('POST', '/v1/storage', $connection + ['provider' => 's3']);
     }
 
     /**
@@ -43,6 +44,22 @@ class Storage
     public function get(string $id):array
     {
         return $this->transport->request('GET', '/v1/storage/' . rawurlencode($id));
+    }
+
+    /**
+     * Change the prefixes, or whether the connection may read or write. Send
+     * the whole new list of prefixes. The API checks the new settings before
+     * keeping them; a verified connection whose check fails stays as it was,
+     * and the error carries the permissions_policy the new settings need.
+     *
+     * @param string               $id      stg_…
+     * @param array<string, mixed> $changes prefixes, read, write.
+     *
+     * @return array<string, mixed>
+     */
+    public function update(string $id, array $changes):array
+    {
+        return $this->transport->request('PATCH', '/v1/storage/' . rawurlencode($id), $changes);
     }
 
     /**

@@ -98,6 +98,23 @@ class ClientTest extends TestCase
         }
     }
 
+    public function test_a_storage_change_whose_check_failed_carries_the_policy_it_needs():void
+    {
+        $policy = ['Version' => '2012-10-17', 'Statement' => [['Effect' => 'Allow', 'Action' => ['s3:GetObject'], 'Resource' => ['arn:aws:s3:::b/archive/*']]]];
+
+        $client = $this->client([
+            new Response(422, [], json_encode(['error' => ['type' => 'invalid_request', 'code' => 'destination_rejected', 'message' => 'The connection was not changed.', 'permissions_policy' => $policy]])),
+        ]);
+
+        try {
+            $client->storage->update('stg_7a', ['prefixes' => ['archive/']]);
+            $this->fail('No exception.');
+        } catch (InvalidRequestException $e) {
+            $this->assertSame('destination_rejected', $e->getErrorCode());
+            $this->assertSame($policy, $e->getError()['permissions_policy']);
+        }
+    }
+
     public function test_wait_polls_until_the_request_finishes():void
     {
         $client = $this->client([
@@ -197,11 +214,12 @@ class ClientTest extends TestCase
 
     public function test_files_storage_events_and_fonts_call_their_endpoints():void
     {
-        $client = $this->client(array_fill(0, 8, new Response(200, [], '{}')));
+        $client = $this->client(array_fill(0, 9, new Response(200, [], '{}')));
 
         $client->files->get('file_1');
         $client->files->delete('file_1');
         $client->storage->connect(['bucket' => 'b', 'region' => 'us-east-1', 'role_arn' => 'arn:aws:iam::1:role/r']);
+        $client->storage->update('stg_7a', ['prefixes' => ['in/', 'archive/']]);
         $client->storage->verify('stg_7a');
         $client->storage->disconnect('stg_7a');
         $client->events->since(new \DateTimeImmutable('2026-10-13T15:00:00Z'), 50);
@@ -214,13 +232,16 @@ class ClientTest extends TestCase
             'GET /v1/files/file_1',
             'DELETE /v1/files/file_1',
             'POST /v1/storage',
+            'PATCH /v1/storage/stg_7a',
             'POST /v1/storage/stg_7a/verify',
             'DELETE /v1/storage/stg_7a',
             'GET /v1/events',
             'GET /v1/fonts',
             'DELETE /v1/uploads/upl_1',
         ], $calls);
-        $this->assertSame('since=2026-10-13T15%3A00%3A00%2B00%3A00&limit=50', $this->history[5]['request']->getUri()->getQuery());
+        $this->assertSame('since=2026-10-13T15%3A00%3A00%2B00%3A00&limit=50', $this->history[6]['request']->getUri()->getQuery());
+        $this->assertSame(['prefixes' => ['in/', 'archive/']], json_decode((string) $this->history[3]['request']->getBody(), true));
+        $this->assertSame('s3', json_decode((string) $this->history[2]['request']->getBody(), true)['provider']);
     }
 
     /**
