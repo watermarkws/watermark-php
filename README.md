@@ -3,7 +3,7 @@
 Watermark, resize and convert images, videos and PDFs with the [Watermark API](https://api.watermark.ws/docs).
 
 ```bash
-composer require watermark/watermark-php
+composer require watermarkws/watermark-php
 ```
 
 Requires PHP 8.1+. Get a key at https://watermark.ws/developers (`wm_test_…` keys are free).
