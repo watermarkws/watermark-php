@@ -244,6 +244,148 @@ class ClientTest extends TestCase
         $this->assertSame('s3', json_decode((string) $this->history[2]['request']->getBody(), true)['provider']);
     }
 
+    public function test_a_batch_is_created_from_sources_and_waited_for_until_it_finishes():void
+    {
+        $counts = fn (int $succeeded, int $failed, int $running, int $waiting) => ['total' => 3, 'succeeded' => $succeeded, 'failed' => $failed, 'aborted' => 0, 'running' => $running, 'waiting' => $waiting];
+
+        $client = $this->client([
+            new Response(202, [], json_encode(['id' => 42, 'object' => 'batch', 'status' => 'queued', 'counts' => $counts(0, 0, 0, 3)])),
+            new Response(200, [], json_encode(['id' => 42, 'object' => 'batch', 'status' => 'processing', 'counts' => $counts(1, 0, 2, 0)])),
+            new Response(200, [], json_encode(['id' => 42, 'object' => 'batch', 'status' => 'partial', 'counts' => $counts(2, 1, 0, 0), 'zips' => [['id' => 'file_1', 'name' => 'batch-42-1', 'format' => 'zip', 'files' => 2, 'url' => 'https://r.test/42-1.zip']]])),
+        ]);
+
+        $batch = $client->batches->create(['https://example.com/a.jpg', 'upl_1', ['storage' => 'stg_7a', 'prefix' => 'photos/']], [
+            'design'          => 'dsn_4hT9kLm2PqR7sV1wX3yZ5a',
+            'operations'      => [['type' => 'resize', 'width' => 1600, 'height' => 1600]],
+            'output'          => ['format' => 'webp'],
+            'zip'             => true,
+            'idempotency_key' => 'shoot-2026-10',
+        ]);
+
+        $this->assertSame('queued', $batch['status']);
+
+        $sent = $this->history[0]['request'];
+
+        $this->assertSame('POST', $sent->getMethod());
+        $this->assertSame('https://api.test/v1/batches', (string) $sent->getUri());
+        $this->assertSame('shoot-2026-10', $sent->getHeaderLine('Idempotency-Key'));
+        $this->assertSame([
+            'sources'    => ['https://example.com/a.jpg', 'upl_1', ['storage' => 'stg_7a', 'prefix' => 'photos/']],
+            'design'     => 'dsn_4hT9kLm2PqR7sV1wX3yZ5a',
+            'operations' => [['type' => 'resize', 'width' => 1600, 'height' => 1600]],
+            'output'     => ['format' => 'webp'],
+            'zip'        => true,
+        ], json_decode((string) $sent->getBody(), true));
+
+        $done = $client->batches->wait(42);
+
+        $this->assertSame('partial', $done['status']);
+        $this->assertSame('https://r.test/42-1.zip', $done['zips'][0]['url']);
+        $this->assertSame([1.0], $this->slept);
+        $this->assertSame('https://api.test/v1/batches/42?wait=25', (string) $this->history[1]['request']->getUri());
+        $this->assertSame('https://api.test/v1/batches/42?wait=25', (string) $this->history[2]['request']->getUri());
+    }
+
+    public function test_waiting_for_a_batch_gives_up_after_the_timeout_and_names_the_batch():void
+    {
+        $client = $this->client(array_fill(0, 5, new Response(200, [], '{"id":42,"status":"processing"}')));
+
+        try {
+            $client->batches->wait(42, 2);
+            $this->fail('No exception.');
+        } catch (TimeoutException $e) {
+            $this->assertSame('Batch 42 was still processing after 2 seconds.', $e->getMessage());
+        }
+    }
+
+    public function test_batches_are_listed_followed_retried_and_aborted():void
+    {
+        $client = $this->client(array_fill(0, 5, new Response(200, [], '{"id":42,"data":[]}')));
+
+        $client->batches->list(['limit' => 5, 'status' => 'partial']);
+        $client->batches->get(42);
+        $client->batches->requests(42, ['status' => 'failed', 'after' => 10, 'limit' => 5]);
+        $client->batches->retry(42);
+        $client->batches->abort(42);
+
+        $calls = array_map(fn (array $entry) => $entry['request']->getMethod() . ' ' . $entry['request']->getUri()->getPath() . ($entry['request']->getUri()->getQuery() ? '?' . $entry['request']->getUri()->getQuery() : ''), $this->history);
+
+        $this->assertSame([
+            'GET /v1/batches?limit=5&status=partial',
+            'GET /v1/batches/42',
+            'GET /v1/batches/42/requests?status=failed&after=10&limit=5',
+            'POST /v1/batches/42/retry',
+            'POST /v1/batches/42/abort',
+        ], $calls);
+    }
+
+    public function test_a_preview_posts_the_media_frame_and_width_and_a_design_needs_no_operations():void
+    {
+        $client = $this->client([
+            new Response(200, [], json_encode(['id' => 9, 'endpoint' => 'previews', 'status' => 'succeeded', 'result' => ['data' => ['width' => 800, 'height' => 450, 'scale' => 0.41, 'layout' => [['type' => 'watermark', 'x' => 16, 'y' => 16, 'width' => 96, 'height' => 40]]], 'files' => [['url' => 'https://r.test/9.webp']]]])),
+            new Response(202, [], json_encode(['id' => 10, 'endpoint' => 'previews', 'status' => 'queued'])),
+        ]);
+
+        $preview = $client->previews->create('https://example.com/talk.mp4', [
+            ['type' => 'watermark', 'image_url' => 'https://example.com/logo.png', 'anchor' => 'top_left', 'margin' => '2%', 'size' => '12%'],
+        ], ['media' => 'video', 'at' => 5, 'width' => 800]);
+
+        $this->assertSame('succeeded', $preview['status']);
+        $this->assertSame(16, $preview['result']['data']['layout'][0]['x']);
+        $this->assertSame('https://api.test/v1/previews', (string) $this->history[0]['request']->getUri());
+        $this->assertSame([
+            'source'     => 'https://example.com/talk.mp4',
+            'operations' => [['type' => 'watermark', 'image_url' => 'https://example.com/logo.png', 'anchor' => 'top_left', 'margin' => '2%', 'size' => '12%']],
+            'media'      => 'video',
+            'at'         => 5,
+            'width'      => 800,
+        ], json_decode((string) $this->history[0]['request']->getBody(), true));
+
+        $client->previews->create('upl_1', [], ['media' => 'document', 'page' => 2, 'design' => 'dsn_4hT9kLm2PqR7sV1wX3yZ5a']);
+
+        $this->assertSame(['source' => 'upl_1', 'media' => 'document', 'page' => 2, 'design' => 'dsn_4hT9kLm2PqR7sV1wX3yZ5a'], json_decode((string) $this->history[1]['request']->getBody(), true));
+    }
+
+    public function test_a_design_is_created_listed_changed_and_deleted_and_used_on_a_request():void
+    {
+        $design = ['id' => 'dsn_4hT9kLm2PqR7sV1wX3yZ5a', 'object' => 'design', 'name' => 'Corner logo', 'media' => 'any', 'operations' => [['type' => 'watermark', 'image' => 'file_6dM3nP8qR1sT4uV7wX0yZ2', 'anchor' => 'bottom_right', 'margin' => '3%', 'size' => '18%']], 'assets' => [['id' => 'file_6dM3nP8qR1sT4uV7wX0yZ2', 'format' => 'png', 'size' => 48213]]];
+
+        $client = $this->client([
+            new Response(201, [], json_encode($design)),
+            new Response(200, [], json_encode(['object' => 'list', 'data' => [$design], 'has_more' => false])),
+            new Response(200, [], json_encode($design)),
+            new Response(200, [], json_encode(['name' => 'Lighter'] + $design)),
+            new Response(200, [], json_encode($design + ['deleted_at' => '2026-10-16T09:00:00Z'])),
+            new Response(202, [], '{"id":11,"status":"queued"}'),
+        ]);
+
+        $created = $client->designs->create(['name' => 'Corner logo', 'operations' => [['type' => 'watermark', 'image' => 'upl_9f3Tq1LmA2bC4dE6fG8hJ0', 'anchor' => 'bottom_right', 'margin' => '3%', 'size' => '18%']]]);
+        $listed = $client->designs->list(['limit' => 5]);
+        $client->designs->get($design['id']);
+        $updated = $client->designs->update($design['id'], ['name' => 'Lighter', 'media' => 'image']);
+        $deleted = $client->designs->delete($design['id']);
+        $client->images->process('https://example.com/a.jpg', [], ['design' => $design['id'], 'output' => ['format' => 'webp']]);
+
+        $this->assertSame('file_6dM3nP8qR1sT4uV7wX0yZ2', $created['assets'][0]['id']);
+        $this->assertSame($design['id'], $listed['data'][0]['id']);
+        $this->assertSame('Lighter', $updated['name']);
+        $this->assertSame('2026-10-16T09:00:00Z', $deleted['deleted_at']);
+
+        $calls = array_map(fn (array $entry) => $entry['request']->getMethod() . ' ' . $entry['request']->getUri()->getPath() . ($entry['request']->getUri()->getQuery() ? '?' . $entry['request']->getUri()->getQuery() : ''), $this->history);
+
+        $this->assertSame([
+            'POST /v1/designs',
+            'GET /v1/designs?limit=5',
+            'GET /v1/designs/dsn_4hT9kLm2PqR7sV1wX3yZ5a',
+            'PATCH /v1/designs/dsn_4hT9kLm2PqR7sV1wX3yZ5a',
+            'DELETE /v1/designs/dsn_4hT9kLm2PqR7sV1wX3yZ5a',
+            'POST /v1/images/process',
+        ], $calls);
+        $this->assertSame('upl_9f3Tq1LmA2bC4dE6fG8hJ0', json_decode((string) $this->history[0]['request']->getBody(), true)['operations'][0]['image']);
+        $this->assertSame(['name' => 'Lighter', 'media' => 'image'], json_decode((string) $this->history[3]['request']->getBody(), true));
+        $this->assertSame(['source' => 'https://example.com/a.jpg', 'design' => $design['id'], 'output' => ['format' => 'webp']], json_decode((string) $this->history[5]['request']->getBody(), true), 'an empty operations list is left out when a design is given');
+    }
+
     /**
      * @param array<int, Response> $responses
      *

@@ -18,7 +18,7 @@ class Requests
     /**
      * The longest the API holds a response, in seconds.
      */
-    public const MAX_HOLD = 25;
+    public const MAX_HOLD = Poll::MAX_HOLD;
 
     /**
      * @param Transport              $transport
@@ -76,30 +76,6 @@ class Requests
      */
     public function wait(int $id, float $timeout = 300, float $interval = 1):array
     {
-        $waited = 0.0;
-
-        while (true) {
-            $hold = (int) min(self::MAX_HOLD, max(0, $timeout - $waited));
-            $before = microtime(true);
-            $request = $this->get($id, $hold ?: null);
-            $took = microtime(true) - $before;
-            $waited += $took;
-
-            if (in_array($request['status'] ?? null, self::FINISHED, true)) {
-                return $request;
-            }
-
-            if ($waited >= $timeout) {
-                throw new TimeoutException("Request {$id} was still {$request['status']} after {$timeout} seconds.");
-            }
-
-            if ($hold > 0 && $took >= $hold - 1) {
-                continue;
-            }
-
-            ($this->sleep)($interval);
-            $waited += $interval;
-            $interval = min(5.0, $interval * 1.5);
-        }
+        return Poll::until(fn (?int $hold) => $this->get($id, $hold), self::FINISHED, "Request {$id}", $timeout, $interval, $this->sleep);
     }
 }

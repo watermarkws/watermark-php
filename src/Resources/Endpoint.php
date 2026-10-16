@@ -11,7 +11,8 @@ final class Endpoint
 {
     /**
      * POST a processing call: the body plus the caller's options, with the
-     * idempotency key sent as its header.
+     * idempotency key sent as its header. An empty operations list is left
+     * out, since a call with a design needs none of its own.
      *
      * @param Transport            $transport
      * @param string               $path
@@ -24,6 +25,10 @@ final class Endpoint
     {
         $idempotencyKey = $options['idempotency_key'] ?? null;
         unset($options['idempotency_key']);
+
+        if (($body['operations'] ?? null) === []) {
+            unset($body['operations']);
+        }
 
         return $transport->request('POST', $path, $body + $options, [], $idempotencyKey);
     }

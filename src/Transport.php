@@ -18,7 +18,7 @@ use Watermark\Api\Exceptions\ApiException;
  */
 class Transport
 {
-    public const VERSION = '0.1.0';
+    public const VERSION = '0.2.0';
 
     private ClientInterface $http;
 
