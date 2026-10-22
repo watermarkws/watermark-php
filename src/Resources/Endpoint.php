@@ -12,7 +12,7 @@ final class Endpoint
     /**
      * POST a processing call: the body plus the caller's options, with the
      * idempotency key sent as its header. An empty operations list is left
-     * out, since a call with a design needs none of its own.
+     * out, since a call with a template needs none of its own.
      *
      * @param Transport            $transport
      * @param string               $path

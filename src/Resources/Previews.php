@@ -5,7 +5,7 @@ namespace Watermark\Api\Resources;
 use Watermark\Api\Transport;
 
 /**
- * One small picture of what operations, or a design, will do to a file,
+ * One small picture of what operations, or a template, will do to a file,
  * before you run them on it or on a batch. A preview is an ordinary request
  * (endpoint "previews") that the API holds for up to 20 seconds and usually
  * finishes within the call; result.files[0] is a WebP kept for a day and
@@ -23,8 +23,8 @@ class Previews
 
     /**
      * @param string|array<string, string>     $source     A URL, an upload (upl_…), a file (file_…) or {"storage": "stg_…", "key": "…"}.
-     * @param array<int, array<string, mixed>> $operations The operations to show; may be empty when a design is given.
-     * @param array<string, mixed>             $options    design (dsn_…), media (image, video or document), width (64-1600),
+     * @param array<int, array<string, mixed>> $operations The operations to show; may be empty when a template is given.
+     * @param array<string, mixed>             $options    template (tpl_…), media (image, video or document), width (64-1600),
      *                                                     at (seconds, for a video), page (from 0, for a document), wait,
      *                                                     webhook_url, events, customer, metadata, idempotency_key.
      *

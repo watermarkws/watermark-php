@@ -27,7 +27,7 @@ if ($done['status'] === 'succeeded') {
 }
 ```
 
-Every processing call starts a background request and returns it (`status: queued`). Options on every call: `webhook_url`, `events`, `customer`, `metadata`, `wait` (seconds the API may hold the answer until the request finishes), `idempotency_key`; calls that make files also take `output` (`['format' => 'png']`) or `outputs`, `process()` and `create()` take `design` (a saved design's operations run first, and the call's own may then be `[]`), and `$client->images->read()` takes `level`. The options array goes to the API as given, so a parameter the API adds later works without an update.
+Every processing call starts a background request and returns it (`status: queued`). Options on every call: `webhook_url`, `events`, `customer`, `metadata`, `wait` (seconds the API may hold the answer until the request finishes), `idempotency_key`; calls that make files also take `output` (`['format' => 'png']`) or `outputs`, `process()` and `create()` take `template` (a saved template's operations run first, and the call's own may then be `[]`), and `$client->images->read()` takes `level`. The options array goes to the API as given, so a parameter the API adds later works without an update.
 
 A `watermark` operation is placed by `anchor`, `margin` and `size` as percentages of the file, which lands the same on every size of file; percentages are strings (`'3%'`), pixels are numbers.
 
@@ -58,20 +58,20 @@ if ($done['status'] === 'partial') {
 }
 ```
 
-`create()` takes `media` (`image` unless sent, `video` or `document`), `design` and/or `operations`, `output` or `outputs`, `destination` (`['storage' => 'stg_…', 'prefix' => 'done/']`, instead of `zip`), `max_duration`, `max_pages`, `webhook_url`, `events` (`batch.finished`, `batch.progress`), `request_events`, `customer`, `metadata` and `idempotency_key`. Each file is an ordinary request with a `batch` and a `position`.
+`create()` takes `media` (`image` unless sent, `video` or `document`), `template` and/or `operations`, `output` or `outputs`, `destination` (`['storage' => 'stg_…', 'prefix' => 'done/']`, instead of `zip`), `max_duration`, `max_pages`, `webhook_url`, `events` (`batch.finished`, `batch.progress`), `request_events`, `customer`, `metadata` and `idempotency_key`. Each file is an ordinary request with a `batch` and a `position`.
 
-## A design, and a preview before the run
+## A template, and a preview before the run
 
 ```php
-$design = $client->designs->create([
+$template = $client->templates->create([
     'name'       => 'Studio corner logo',
     'operations' => [['type' => 'watermark', 'image' => $upload['id'], 'anchor' => 'bottom_right', 'margin' => '3%', 'size' => '18%']],
-]);   // the upload becomes an asset of the design, kept as long as it is
+]);   // the upload becomes an asset of the template, kept as long as it is
 
-$preview = $client->previews->create('https://example.com/photo.jpg', [], ['design' => $design['id'], 'width' => 800]);
+$preview = $client->previews->create('https://example.com/photo.jpg', [], ['template' => $template['id'], 'width' => 800]);
 $picture = $preview['result']['files'][0]['url'];         // a WebP, kept a day; result.data.layout says where the logo landed
 
-$client->images->process('https://example.com/photo.jpg', [['type' => 'resize', 'width' => 1600, 'height' => 1600]], ['design' => $design['id']]);
+$client->images->process('https://example.com/photo.jpg', [['type' => 'resize', 'width' => 1600, 'height' => 1600]], ['template' => $template['id']]);
 ```
 
 A preview is a request the API usually finishes within the call (`status: succeeded`); when it comes back `queued`, wait for it with `$client->requests->wait()`. It takes `media`, `width` (64 to 1600), `at` (seconds, for a video) and `page` (from 0, for a document).
@@ -90,7 +90,7 @@ A preview is a request the API usually finishes within the call (`status: succee
 | `$client->batches->list($query)` / `->get($id, $wait)` / `->requests($id, $query)` | `GET /v1/batches`, `/v1/batches/{id}`, `/v1/batches/{id}/requests` |
 | `$client->batches->retry($id)` / `->abort($id)` | `POST /v1/batches/{id}/retry`, `/abort` |
 | `$client->batches->wait($id, $timeout)` | Polls `GET /v1/batches/{id}` |
-| `$client->designs->create([...])` / `->list($query)` / `->get($id)` / `->update($id, [...])` / `->delete($id)` | `/v1/designs` |
+| `$client->templates->create([...])` / `->list($query)` / `->get($id)` / `->update($id, [...])` / `->delete($id)` | `/v1/templates` |
 | `$client->requests->get($id)` / `->list()` / `->abort($id)` / `->wait($id)` | `/v1/requests` |
 | `$client->account->get()` / `->usage([...])` / `->operations()` | `/v1/account`, `/v1/usage`, `/v1/operations` |
 | `$client->files->get($id)` / `->delete($id)` | `/v1/files` |
@@ -104,7 +104,7 @@ Operations and their parameters: https://api.watermark.ws/docs/operations.md
 
 API errors throw `Watermark\Api\Exceptions\ApiException` subclasses (`InvalidRequestException`, `PaymentRequiredException`, `RateLimitException`, ...). Branch on `getErrorCode()`; `getParam()` names the input at fault. The client passes every error code through as the API sends it, so a code added later needs no update; the codes are listed at https://api.watermark.ws/docs/errors.md. `getError()` is the whole error object, with the fields some errors add, such as the `permissions_policy` a storage change whose check failed needs. A failed *request* is not an exception: its `status` is `failed` and `error` says why; nor is a `partial` batch, whose failed files `$client->batches->requests($id, ['status' => 'failed'])` lists.
 
-Batches and designs add these codes:
+Batches and templates add these codes:
 
 - `batch_too_large` (422, `InvalidRequestException`): more files than the account's `batch_max_files`, a listed prefix included.
 - `empty_source_list` (422, `InvalidRequestException`): the sources named no file.
@@ -112,10 +112,10 @@ Batches and designs add these codes:
 - `batch_not_finished` (409, `ConflictException`): a retry of a batch that is still running.
 - `nothing_to_retry` (409, `ConflictException`): a retry of a batch with no failed file.
 - `batch_finished` (409, `ConflictException`): an abort of a batch that is already done.
-- `design_not_found` (404, `NotFoundException`): no such design on the account, or it was deleted.
-- `design_media_mismatch` (422, `InvalidRequestException`): a design made for another media.
-- `too_many_designs` (422, `InvalidRequestException`): the account already keeps `max_designs`.
-- `upload_in_use` (409, `ConflictException`): an upload a request or design has already taken.
+- `template_not_found` (404, `NotFoundException`): no such template on the account, or it was deleted.
+- `template_media_mismatch` (422, `InvalidRequestException`): a template made for another media.
+- `too_many_templates` (422, `InvalidRequestException`): the account already keeps `max_templates`.
+- `upload_in_use` (409, `ConflictException`): an upload a request or template has already taken.
 
 The client retries 429s (after `Retry-After`), 5xx responses and dropped connections twice, sending the same `Idempotency-Key`, so a retry never runs a request twice.
 

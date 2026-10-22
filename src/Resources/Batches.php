@@ -11,7 +11,7 @@ use Watermark\Api\Transport;
  * results at the end or writes them into your bucket.
  *
  *     $batch = $client->batches->create($urls, [
- *         'design' => 'dsn_…',
+ *         'template' => 'tpl_…',
  *         'output' => ['format' => 'webp'],
  *         'zip'    => true,
  *     ]);
@@ -39,7 +39,7 @@ class Batches
      *
      * @param array<int, string|array<string, string>> $sources Each a URL, upl_…, file_…, {"storage": "stg_…", "key": "…"}
      *                                                          or {"storage": "stg_…", "prefix": "folder/"}.
-     * @param array<string, mixed>                     $options media, design, operations (one of design and operations is required),
+     * @param array<string, mixed>                     $options media, template, operations (one of template and operations is required),
      *                                                          output or outputs, destination, zip, max_duration, max_pages,
      *                                                          webhook_url, events, request_events, customer, metadata, idempotency_key.
      *
