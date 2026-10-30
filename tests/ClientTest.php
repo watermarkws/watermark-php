@@ -162,6 +162,16 @@ class ClientTest extends TestCase
         $this->assertSame(['storage' => 'stg_7a', 'key' => 'in/clip.mov'], json_decode((string) $this->history[1]['request']->getBody(), true)['source']);
     }
 
+    public function test_a_screenshot_sends_its_second_and_auto_to_pass_over_a_blank_frame():void
+    {
+        $client = $this->client([new Response(202, [], '{"id":6}')]);
+
+        $client->videos->screenshot('https://example.com/clip.mp4', 0, ['auto' => true, 'output' => ['format' => 'jpg']]);
+
+        $this->assertSame('https://api.test/v1/videos/screenshot', (string) $this->history[0]['request']->getUri());
+        $this->assertSame(['source' => 'https://example.com/clip.mp4', 'seconds' => 0, 'auto' => true, 'output' => ['format' => 'jpg']], json_decode((string) $this->history[0]['request']->getBody(), true));
+    }
+
     public function test_an_upload_is_made_and_the_file_put_to_its_url():void
     {
         $path = tempnam(sys_get_temp_dir(), 'wm') . '.png';

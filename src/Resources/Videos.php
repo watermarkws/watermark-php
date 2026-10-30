@@ -43,7 +43,7 @@ class Videos
      *
      * @param string|array<string, string>               $source A URL, an upload (upl_…), a file (file_…) or {"storage": "stg_…", "key": "…"}.
      * @param int                  $seconds From the start.
-     * @param array<string, mixed> $options output (['format' => 'png']), webhook_url, ...
+     * @param array<string, mixed> $options auto (true: when the frame at $seconds is blank, take one from 10% in, or the middle; result.data.seconds says which), output (['format' => 'png']), webhook_url, ...
      *
      * @return array<string, mixed> The request.
      */
