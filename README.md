@@ -27,7 +27,7 @@ if ($done['status'] === 'succeeded') {
 }
 ```
 
-Every processing call starts a background request and returns it (`status: queued`). Options on every call: `webhook_url`, `events`, `customer`, `metadata`, `wait` (seconds the API may hold the answer until the request finishes), `idempotency_key`; calls that make files also take `output` (`['format' => 'png']`) or `outputs`; `$client->images->read()` takes `level`, and `$client->videos->screenshot()` takes `auto` (when the frame at `seconds` is blank, such as a black opening or a fade, take one from 10% of the way in, or the middle; the result's `data.seconds` says which moment was used). The options array goes to the API as given, so a parameter the API adds later works without an update.
+Every processing call starts a background request and returns it (`status: queued`). Options on every call: `webhook_url`, `events`, `customer`, `metadata`, `wait` (seconds the API may hold the answer until the request finishes), `idempotency_key`; calls that make files also take `output` (`['format' => 'png']`) or `outputs`; `$client->images->read()` takes `level`, and `$client->videos->screenshot()` takes `auto` (when the frame at `seconds` is blank, such as a black opening or a fade, take one from 10% of the way in, or the middle; the result's `data.seconds` says which moment was used), and `$client->documents->snapshot()` takes `background` (`white`, or `transparent` to keep a logo drawn on a page see-through; it needs `output` `['format' => 'png']`) and `trim` (`true` cuts the empty edge, so a logo comes out as just the logo). The options array goes to the API as given, so a parameter the API adds later works without an update.
 
 | Call | Endpoint |
 | --- | --- |

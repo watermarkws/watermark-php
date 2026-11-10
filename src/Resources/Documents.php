@@ -43,7 +43,7 @@ class Documents
      *
      * @param string|array<string, string>               $source A URL, an upload (upl_…), a file (file_…) or {"storage": "stg_…", "key": "…"}.
      * @param int                  $page
-     * @param array<string, mixed> $options output (['format' => 'png']), webhook_url, ...
+     * @param array<string, mixed> $options background ('white', or 'transparent' to keep a logo's empty parts see-through; needs output ['format' => 'png']), trim (true: cut the empty edge), output (['format' => 'png']), webhook_url, ...
      *
      * @return array<string, mixed> The request.
      */

@@ -172,6 +172,16 @@ class ClientTest extends TestCase
         $this->assertSame(['source' => 'https://example.com/clip.mp4', 'seconds' => 0, 'auto' => true, 'output' => ['format' => 'jpg']], json_decode((string) $this->history[0]['request']->getBody(), true));
     }
 
+    public function test_a_snapshot_sends_background_and_trim_to_make_a_see_through_logo():void
+    {
+        $client = $this->client([new Response(202, [], '{"id":7}')]);
+
+        $client->documents->snapshot('https://example.com/logo.pdf', 1, ['background' => 'transparent', 'trim' => true, 'output' => ['format' => 'png']]);
+
+        $this->assertSame('https://api.test/v1/documents/snapshot', (string) $this->history[0]['request']->getUri());
+        $this->assertSame(['source' => 'https://example.com/logo.pdf', 'page' => 1, 'background' => 'transparent', 'trim' => true, 'output' => ['format' => 'png']], json_decode((string) $this->history[0]['request']->getBody(), true));
+    }
+
     public function test_an_upload_is_made_and_the_file_put_to_its_url():void
     {
         $path = tempnam(sys_get_temp_dir(), 'wm') . '.png';
