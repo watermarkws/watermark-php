@@ -53,6 +53,7 @@ class SpecCoverageTest extends TestCase
             'POST /v1/documents/process'  => ['body' => 'pass-through', 'call' => fn (Client $c, array $b) => $c->documents->process($b['source'], $b['operations'], $rest($b, 'source', 'operations'))],
             'POST /v1/documents/read'     => ['body' => 'pass-through', 'call' => fn (Client $c, array $b) => $c->documents->read($b['source'], $rest($b, 'source'))],
             'POST /v1/documents/snapshot' => ['body' => 'pass-through', 'call' => fn (Client $c, array $b) => $c->documents->snapshot($b['source'], $b['page'], $rest($b, 'source', 'page'))],
+            'POST /v1/documents/convert'  => ['body' => 'pass-through', 'call' => fn (Client $c, array $b) => $c->documents->convert($b['source'], $rest($b, 'source'))],
             'GET /v1/requests'            => ['call' => fn (Client $c, array $b, array $q) => $c->requests->list($q['limit'], $q['before'])],
             'GET /v1/requests/{id}'       => ['call' => fn (Client $c, array $b, array $q) => $c->requests->get(1234, $q['wait'])],
             'POST /v1/requests/{id}/abort' => ['call' => fn (Client $c) => $c->requests->abort(1234)],

@@ -38,6 +38,7 @@ Every processing call starts a background request and returns it (`status: queue
 | `$client->videos->read($source)` / `->screenshot($source, $seconds)` | `POST /v1/videos/read`, `/screenshot` |
 | `$client->documents->process($source, $operations)` | `POST /v1/documents/process` |
 | `$client->documents->read($source)` / `->snapshot($source, $page)` | `POST /v1/documents/read`, `/snapshot` |
+| `$client->documents->convert($source)` | `POST /v1/documents/convert`: a Word, PowerPoint, OpenDocument or RTF file as a PDF of every page |
 | `$client->requests->get($id)` / `->list()` / `->abort($id)` / `->wait($id)` | `/v1/requests` |
 | `$client->account->get()` / `->usage([...])` / `->operations()` | `/v1/account`, `/v1/usage`, `/v1/operations` |
 | `$client->files->get($id)` / `->delete($id)` | `/v1/files` |

@@ -182,6 +182,19 @@ class ClientTest extends TestCase
         $this->assertSame(['source' => 'https://example.com/logo.pdf', 'page' => 1, 'background' => 'transparent', 'trim' => true, 'output' => ['format' => 'png']], json_decode((string) $this->history[0]['request']->getBody(), true));
     }
 
+    public function test_a_conversion_sends_the_source_and_the_output_to_documents_convert():void
+    {
+        $client = $this->client([new Response(202, [], '{"id":8}')]);
+
+        $client->documents->convert(['storage' => 'stg_7a', 'key' => 'docs/deck.pptx'], ['outputs' => [['name' => 'result', 'format' => 'pdf', 'destination' => ['storage' => 'stg_7a', 'key' => 'docs/deck.pdf']]]]);
+
+        $this->assertSame('https://api.test/v1/documents/convert', (string) $this->history[0]['request']->getUri());
+        $this->assertSame([
+            'source'  => ['storage' => 'stg_7a', 'key' => 'docs/deck.pptx'],
+            'outputs' => [['name' => 'result', 'format' => 'pdf', 'destination' => ['storage' => 'stg_7a', 'key' => 'docs/deck.pdf']]],
+        ], json_decode((string) $this->history[0]['request']->getBody(), true));
+    }
+
     public function test_an_upload_is_made_and_the_file_put_to_its_url():void
     {
         $path = tempnam(sys_get_temp_dir(), 'wm') . '.png';

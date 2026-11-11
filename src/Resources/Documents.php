@@ -5,7 +5,7 @@ namespace Watermark\Api\Resources;
 use Watermark\Api\Transport;
 
 /**
- * PDF endpoints.
+ * Document endpoints: PDFs, and office documents read as PDFs.
  */
 class Documents
 {
@@ -50,5 +50,19 @@ class Documents
     public function snapshot(string|array $source, int $page = 1, array $options = []):array
     {
         return Endpoint::post($this->transport, '/v1/documents/snapshot', ['source' => $source, 'page' => $page], $options);
+    }
+
+    /**
+     * Turn a Word, PowerPoint, OpenDocument or RTF file into a PDF of every
+     * page, a deck one page per slide. A PDF source fails (unsupported_media).
+     *
+     * @param string|array<string, string> $source  A URL, an upload (upl_…), a file (file_…) or {"storage": "stg_…", "key": "…"}.
+     * @param array<string, mixed>         $options outputs or output (['format' => 'pdf']), webhook_url, customer, metadata, idempotency_key.
+     *
+     * @return array<string, mixed> The request.
+     */
+    public function convert(string|array $source, array $options = []):array
+    {
+        return Endpoint::post($this->transport, '/v1/documents/convert', ['source' => $source], $options);
     }
 }
